@@ -30,3 +30,11 @@ func (h *CouponHandler) CreateCoupon(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, coupon)
 }
+
+func (h *CouponHandler) GetCoupons(c *gin.Context) {
+	var coupons []models.Coupon
+
+	h.DB.Find(&coupons)
+
+	c.JSON(http.StatusOK, coupons)
+}
