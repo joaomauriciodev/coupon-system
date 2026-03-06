@@ -3,6 +3,7 @@ package handlers
 import (
 	"coupon-system/internal/models"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -26,7 +27,17 @@ func (h *CouponHandler) CreateCoupon(c *gin.Context) {
 
 	coupon.Active = true
 
-	h.DB.Create(&coupon)
+	result := h.DB.Create(&coupon)
+
+	if result.Error != nil {
+		if strings.Contains(result.Error.Error(), "duplicate key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Coupon code already exists"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create coupon"})
+		return
+	}
 
 	c.JSON(http.StatusCreated, coupon)
 }
