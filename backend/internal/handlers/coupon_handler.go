@@ -2,18 +2,17 @@ package handlers
 
 import (
 	"coupon-system/internal/models"
+	"database/sql"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type CouponHandler struct {
-	DB *gorm.DB
+	DB *sql.DB
 }
 
-func NewCouponHandler(db *gorm.DB) *CouponHandler {
+func NewCouponHandler(db *sql.DB) *CouponHandler {
 	return &CouponHandler{DB: db}
 }
 
@@ -27,15 +26,26 @@ func (h *CouponHandler) CreateCoupon(c *gin.Context) {
 
 	coupon.Active = true
 
-	result := h.DB.Create(&coupon)
+	query := `
+	INSER INTO coupons
+	(code, discount_type, discount_value, max_uses, min_order_value, expires_at)
+	VALUE ($1,$2,$3,$4,$5,$6)
+	RETURNING id, created_at
+	`
+	err := h.DB.QueryRow(
+		query,
+		coupon.Code,
+		coupon.DiscountType,
+		coupon.DiscountValue,
+		coupon.MaxUses,
+		coupon.MinOrderValue,
+		coupon.ExpiresAt,
+	).Scan(&coupon.ID, &coupon.CreatedAt)
 
-	if result.Error != nil {
-		if strings.Contains(result.Error.Error(), "duplicate key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Coupon code already exists"})
-			return
-		}
-
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create coupon"})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
@@ -43,9 +53,46 @@ func (h *CouponHandler) CreateCoupon(c *gin.Context) {
 }
 
 func (h *CouponHandler) GetCoupons(c *gin.Context) {
+	rows, err := h.DB.Query(`
+		SELECT id, code, discount_type, discount_value, max_uses,
+		current_uses, min_order_value, expires_at, active, created_at
+		FROM coupons
+	`)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+	}
+
+	defer rows.Close()
+
 	var coupons []models.Coupon
 
-	h.DB.Find(&coupons)
+	for rows.Next() {
+		var coupon models.Coupon
+
+		err := rows.Scan(
+			&coupon.ID,
+			&coupon.Code,
+			&coupon.DiscountType,
+			&coupon.DiscountValue,
+			&coupon.MaxUses,
+			&coupon.CurrentUses,
+			&coupon.MinOrderValue,
+			&coupon.ExpiresAt,
+			&coupon.Active,
+			&coupon.CreatedAt,
+		)
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+		}
+
+		coupons = append(coupons, coupon)
+	}
 
 	c.JSON(http.StatusOK, coupons)
 }
