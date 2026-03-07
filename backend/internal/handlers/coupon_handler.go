@@ -27,9 +27,9 @@ func (h *CouponHandler) CreateCoupon(c *gin.Context) {
 	coupon.Active = true
 
 	query := `
-	INSER INTO coupons
+	INSERT INTO coupons
 	(code, discount_type, discount_value, max_uses, min_order_value, expires_at)
-	VALUE ($1,$2,$3,$4,$5,$6)
+	VALUES ($1,$2,$3,$4,$5,$6)
 	RETURNING id, created_at
 	`
 	err := h.DB.QueryRow(
