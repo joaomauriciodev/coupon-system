@@ -16,6 +16,7 @@ func main() {
 
 	router.GET("/coupons", couponHandler.GetCoupons)
 	router.POST("/coupons", couponHandler.CreateCoupon)
+	router.POST("/coupons/validate", couponHandler.ValidateCoupon)
 
 	router.Run(":8080")
 

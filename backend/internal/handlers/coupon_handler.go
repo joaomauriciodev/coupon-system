@@ -4,6 +4,7 @@ import (
 	"coupon-system/internal/models"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -95,4 +96,80 @@ func (h *CouponHandler) GetCoupons(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, coupons)
+}
+
+func (h *CouponHandler) ValidateCoupon(c *gin.Context) {
+	var req models.CouponValidationRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	query := `
+		SELECT id, code, discount_type, discount_value,
+		max_uses, current_uses, min_order_value, expires_at, active
+		FROM coupons
+		WHERE code = $1
+	`
+	var coupon models.Coupon
+
+	err := h.DB.QueryRow(query, req.Code).Scan(
+		&coupon.ID,
+		&coupon.Code,
+		&coupon.DiscountType,
+		&coupon.DiscountValue,
+		&coupon.MaxUses,
+		&coupon.CurrentUses,
+		&coupon.MinOrderValue,
+		&coupon.ExpiresAt,
+		&coupon.Active,
+	)
+
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{
+			"valid":   false,
+			"message": "coupon not found",
+		})
+		return
+	}
+
+	if !coupon.Active {
+		c.JSON(http.StatusNotFound, gin.H{
+			"valid":   false,
+			"message": "coupon is not active",
+		})
+		return
+	}
+
+	if time.Now().After(coupon.ExpiresAt) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"valid":   false,
+			"message": "coupon has expired",
+		})
+		return
+	}
+
+	if req.OrderValue < coupon.MinOrderValue {
+		c.JSON(http.StatusNotFound, gin.H{
+			"valid":   false,
+			"message": "order value does not meet minimum requirement",
+		})
+		return
+	}
+
+	var discount float64
+
+	if coupon.DiscountType == "percentage" {
+		discount = req.OrderValue * (coupon.DiscountValue / 100)
+	} else {
+		discount = coupon.DiscountValue
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"valid":    true,
+		"discount": discount,
+	})
 }
