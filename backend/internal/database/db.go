@@ -1,19 +1,24 @@
 package database
 
 import (
+	"database/sql"
 	"log"
-
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
-func Connect() *gorm.DB {
-	dsn := "host=localhost user=postgres password=postgres dbname=coupons port=5432 sslmode=disable"
+func Connect() *sql.DB {
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	connStr := "host=localhost user=postgres password=postgres dbname=coupons port=5432 sslmode=disable"
+
+	db, err := sql.Open("postgres", connStr)
 
 	if err != nil {
-		log.Fatal("Error connecting to the database")
+		log.Fatal("Error connecting to the database", err)
+	}
+
+	err = db.Ping()
+
+	if err != nil {
+		log.Fatal("Error pinging the database", err)
 	}
 
 	return db
